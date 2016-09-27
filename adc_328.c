@@ -22,7 +22,8 @@ void init_adc_fr(uint8_t reference, uint8_t clocksetting, uint8_t setchannels)
 {
 	uint8_t j=0;
 	uint8_t i=0;
-	DDRC|= setchannels & ADC_INPUTPIN_MASK
+	ADC_DDR &= ~(setchannels & ADC_INPUTPIN_MASK)
+
 	// This Code translates the set bits into the Channelstatus bytes so that the Library can work with it.
 	while(j<ADC_CHANNELAMOUNT){
 		if(setchannels != 0){
@@ -36,22 +37,23 @@ void init_adc_fr(uint8_t reference, uint8_t clocksetting, uint8_t setchannels)
 		j++;
 	}
 
-	ADMUX |= (1 << REFS0);					/* reference voltage on AVCC */
 	// TODO write atomatic frequency scailing code
-		ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADPS0);	/* ADC clock prescaler 128 */
-	// TODO end
+	ADMUX |= (1 << REFS0);					/* reference voltage on AVCC */
+	ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADPS0);	/* ADC clock prescaler 128 */
 	ADCSRA |= (1 << ADEN);					/* enable ADC */
 	ADCSRA |= (1 << ADIE);					/* set the interrupt enable Flag */
+	ADMUX &= ~(1 << ADLAR);					/* set the reult right adjusted */
 
 	if(setchannels==0){
-		ADCSRA |= (1 << ADATE);				/* enable the auto triggering to free running mode for there a no channels to sample*/
-		ADCSRA |= (1 << ADIE);				/* set the interrupt enable Flag */
+		ADCSRA &= ~(1 << ADATE);				/* disable the auto triggering to free running mode for there a no channels to sample*/
+		ADCSRA &= ~(1 << ADIE);					/* disable the interrupt enable Flag */
 	}
 	else{
-	ADCSRA |= (1 << ADATE);					/* enable the auto triggering to free running mode */
-	ADMUX &= 0b11110000;					/* clear the admux bits */
-	ADMUX |= (channelstatus[0] & 0b00001111);		/* set the first channel to sample */
-	adcchannelcounter |= (j & ADC_CHANNEL_SELECTION_MASK);	/* set the amout of channels to be sampled*/
+		ADCSRA &= ~(1 << ADATE);				/* disable the auto triggering, we are emulating it in software */
+		ADMUX &= 0b11110000;					/* clear the admux bits */
+		ADMUX |= (channelstatus[0] & 0b00001111);		/* set the first channel to sample */
+		adcstatusreg |= (j & ADC_CHANNEL_SELECTION_MASK);	/* set the amout of channels to be sampled*/
+		adcchannelcounter = 1;
 	}
 }
 
@@ -59,23 +61,25 @@ void set_adc_reference( uint8_t reference)
 {
 	ADMUX &= ~((1<<REFS1) | (1<<REFS0));		/* clear the old reference Selection */
 	ADMUX |= (reference & 0b11000000);		/* Set the new one */
-
 }
 
 uint8_t adc_read_8bit(uint8_t channel)
 {
-	ADMUX = ( 0b11110000 & ADMUX ) | channel;	/* select the channel */
+	ADMUX = ( (!ADC_CHANNEL_SELECTION_MASK) & ADMUX ) | (channel & ADC_CHANNEL_SELECTION_MASK);	/* select the channel */
 	ADCSRA |= (1 << ADSC);				/* start the conversion */
 	loop_until_bit_is_clear(ADCSRA, ADSC);		/* wait for the conversion to finish */
 	ADCSRA |= (1<< ADIF);				/* clear the Interrupt Flag */
 	return ADCH;					/* return the high byte of the result making it 8 bit resolution */
 }
 
+
 ISR(ADC_vect)
 {
 	// First we want to select the next channel to sample so we shift
-	while(!((channelflagreg>>channel) & 0b00000001)){	/* Select the first channel to sample */
-		channel++;
+	if(adcchannelcounter>=(adcstatusreg & ADC_CHANNEL_SELECTION_MASK)){
+		adcchannelcounter=0;
 	}
-	
+	// TODO add the copy and set code in the ISR
+	ADMUX |= adcchannelcounter;
+	adcchannelcounter++;
 }
