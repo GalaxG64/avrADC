@@ -6,6 +6,7 @@
 #define ADC_CHANNELDEPTH(bit) ((((bit)-1)/8)+1)		// CAREFUL you are not allowed to enter a 0 into this funktion or it will produce massive buffers
 #define ADC_CHANNEL_SELECTION_MASK 0x0f
 #define ADC_INPUTPIN_MASK 0xbf
+#define ADC_DDR DDRC
 
 // These Defines are used as reference Selectors in the set_adc_reference
 #define ADC_REF_AREF 0
