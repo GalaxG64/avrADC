@@ -8,7 +8,7 @@
 volatile uint8_t adcresults[ADC_CHANNELAMOUNT*CHANELDEPTH];
 volatile uint8_t channelstatus[ADC_CHANNELAMOUNT];
 volatile uint8_t adcstatusreg;
-volatile uint8_t adcchannelcounter;
+volatile uint8_t adc_active_channel;
 
 void init_adc_sc(void)
 {
@@ -53,7 +53,7 @@ void init_adc_fr(uint8_t reference, uint8_t clocksetting, uint8_t setchannels)
 		ADMUX &= 0b11110000;					/* clear the admux bits */
 		ADMUX |= (channelstatus[0] & 0b00001111);		/* set the first channel to sample */
 		adcstatusreg |= (j & ADC_CHANNEL_SELECTION_MASK);	/* set the amout of channels to be sampled*/
-		adcchannelcounter = 1;
+		adc_active_channel = 1;
 	}
 }
 
@@ -63,7 +63,7 @@ void set_adc_reference( uint8_t reference)
 	ADMUX |= (reference & 0b11000000);		/* Set the new one */
 }
 
-uint8_t adc_read_8bit(uint8_t channel)
+uint8_t adc_read_sc(uint8_t channel)
 {
 	ADMUX = ( (!ADC_CHANNEL_SELECTION_MASK) & ADMUX ) | (channel & ADC_CHANNEL_SELECTION_MASK);	/* select the channel */
 	ADCSRA |= (1 << ADSC);				/* start the conversion */
@@ -72,14 +72,27 @@ uint8_t adc_read_8bit(uint8_t channel)
 	return ADCH;					/* return the high byte of the result making it 8 bit resolution */
 }
 
+uint16_t adc_read_fr(uint8_t channel)
+{
+	uint16_t result=0;
+	uint8_t i;
+	uint8_t bufferwidth ADC_CHANNELDEPTH(ADC_CURRENT_CHANNELDEPTH)
+	for( i=0; i<bufferwidth; i++ ){
+		result |= (adcresults[(channel*bufferwidth)+i]<<(i*8))
+	}
+	return result;
+}
 
 ISR(ADC_vect)
 {
-	// First we want to select the next channel to sample so we shift
-	if(adcchannelcounter>=(adcstatusreg & ADC_CHANNEL_SELECTION_MASK)){
-		adcchannelcounter=0;
-	}
 	// TODO add the copy and set code in the ISR
-	ADMUX |= adcchannelcounter;
-	adcchannelcounter++;
+	bufferpointer=adc_active_channel*ADC_CHANNELDEPTH(ADC_CURRENT_CHANNELDEPTH)
+	adcresults[bufferpointer]=ADCL;
+	adcresults[bufferpointer+1]=ADCH;
+	adc_active_channel++;								// here we increment the channelcounter to the next 
+	if(adc_active_channel>=(adcstatusreg & ADC_CHANNEL_SELECTION_MASK)){
+		adc_active_channel=0;
+	}
+	ADMUX |= channelstatus[adc_active_channel & ADC_CHANNEL_SELECTION_MASK];
+	ADCSRA |= (1<<ADSC);
 }
