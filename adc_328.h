@@ -7,6 +7,7 @@
 #define ADC_CHANNEL_SELECTION_MASK 0x0f
 #define ADC_INPUTPIN_MASK 0xbf
 #define ADC_DDR DDRC
+#define ADC_CURRENT_CHANNELDEPTH 10
 
 // These Defines are used as reference Selectors in the set_adc_reference
 #define ADC_REF_AREF 0
@@ -21,4 +22,5 @@
 void init_adc_sc(void);
 void init_adc_fr(void);
 uint8_t adc_read_8bit(uint8_t channel);
+// TODO add missing function Prototypes.
 #endif
