@@ -12,8 +12,10 @@ volatile uint8_t adc_active_channel;
 
 void init_adc_sc(void)
 {
+	ADMUX = 0;						/* clear the register before Writing to it */
 	ADMUX |= (1 << REFS0);					/* reference voltage on AVCC */
 	ADMUX |= (1 << ADLAR);					/*left adjust result*/
+	ADCSRA = 0;						/* clear the register before Writing to it */
 	ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADPS0);	/* ADC clock prescaler 128 */
 	ADCSRA |= (1 << ADEN);					/* enable ADC */
 }
@@ -31,8 +33,12 @@ void init_adc_fr(uint8_t reference, uint8_t clocksetting, uint8_t setchannels)
 				i++;
 			}
 			setchannels &= ~(1<<i);
-			channelstatus[j] |= (i & ADC_CHANNEL_SELECTION_MASK);
+			channelstatus[j] |= (1<<ADC_CHANNELSELECT);	/* set the Channelselect bit */
+			channelstatus[j] |= (i & ADC_CHANNEL_SELECTION_MASK);	/* set the selected Channel */
 			i=0;
+		}
+		else{
+			channelstatus[j] &= 0xe0 ;		/* clear the channel from the list of sampled Channels*/
 		}
 		j++;
 	}
@@ -89,10 +95,14 @@ ISR(ADC_vect)
 	bufferpointer=adc_active_channel*ADC_CHANNELDEPTH(ADC_CURRENT_CHANNELDEPTH)
 	adcresults[bufferpointer]=ADCL;
 	adcresults[bufferpointer+1]=ADCH;
-	adc_active_channel++;								// here we increment the channelcounter to the next 
-	if(adc_active_channel>=(adcstatusreg & ADC_CHANNEL_SELECTION_MASK)){
-		adc_active_channel=0;
-	}
-	ADMUX |= channelstatus[adc_active_channel & ADC_CHANNEL_SELECTION_MASK];
-	ADCSRA |= (1<<ADSC);
+	// Select the next channel to sample
+	do{
+		adc_active_channel ++;
+		if(adc_active_channel>=(adcstatusreg & ADC_CHANNEL_SELECTION_MASK)){
+			adc_active_channel = 0 ;
+			break;
+		}
+	}while(!(channelstatus[adc_active_channel]&(1<<ADC_CHANNELSELECT)))
+	ADMUX |= channelstatus[adc_active_channel & ADC_CHANNEL_SELECTION_MASK];	/* Set the new channel to be sampled */
+	ADCSRA |= (1<<ADSC);								/* Start the next conversion */
 }
