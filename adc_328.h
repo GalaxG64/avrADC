@@ -9,6 +9,9 @@
 #define ADC_DDR DDRC
 #define ADC_CURRENT_CHANNELDEPTH 10
 
+// These Defines Set bits in the different software status Registers
+#define ADC_CHANNELSELECT 4
+
 // These Defines are used as reference Selectors in the set_adc_reference
 #define ADC_REF_AREF 0
 #define ADC_REF_AVCC (1<<REFS0)
